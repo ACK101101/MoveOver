@@ -1,0 +1,1 @@
+- how does the KC Scout event log work?
