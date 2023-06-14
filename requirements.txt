@@ -2,3 +2,7 @@ tensorflow
 opencv-python
 ipykernel
 matplotlib
+scipy
+scikit-learn
+chardet
+pandas
