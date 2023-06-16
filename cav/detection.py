@@ -29,7 +29,7 @@ class ObjectDetector:
         self.detection_threshold = detection_threshold
         self.tf_version = int(tf.__version__.split('.')[0])
         
-        if self.tf_version==1:
+        if self.tf_version == 1:
             self.detection_graph = tf.Graph()
             with self.detection_graph.as_default():
                 od_graph_def = tf.GraphDef()            
@@ -46,8 +46,10 @@ class ObjectDetector:
 
                 self.sess = tf.Session(graph=self.detection_graph)
         else:
+            #! there is no self.model in doc string
             self.model = tf.saved_model.load(path_to_graph)
         
+        return
             
 
     def _detect_tf1(self, image, timestamp = None, returnBBoxes = True, detectThreshold = None):
@@ -127,7 +129,7 @@ class ObjectDetector:
             output_dict['detection_classes'] = output_dict['detection_classes'].astype(np.int64)                
                 
             scores = output_dict['detection_scores']
-            cond = scores > detectThreshold
+            cond = scores > detectThreshold                     # bool mask
             boxes = output_dict['detection_boxes'][cond]
             classes = output_dict['detection_classes'][cond]
             scores = scores[cond]                
