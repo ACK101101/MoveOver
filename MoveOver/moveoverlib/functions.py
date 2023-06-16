@@ -51,11 +51,10 @@ def extractFrame(video_path = None, cap = None, frameno = 1, dest_file = None, d
     else:
         cap = cv2.VideoCapture(video_path)
         
-    cap.set(1,frameno);
-    fourcc = cv2.VideoWriter_fourcc(*'XVID')
-    ret, image = cap.read()
+    cap.set(1,frameno)
+    _, image = cap.read()
     if dest_file is not None:
-        cv2.imwrite(dest_file,image)
+        cv2.imwrite(dest_file, image)
     
     if display:
         im2 = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
