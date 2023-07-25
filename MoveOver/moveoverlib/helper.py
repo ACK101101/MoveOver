@@ -11,6 +11,8 @@ import glob
 from time import time, strftime, gmtime
 
 
+#! Where is tf actually used?
+#! seems like this is just superimposing the bb's and making a vid
 class ImageEncoder(object):
 
     def __init__(self, checkpoint_filename, input_name="images",
@@ -61,6 +63,7 @@ class ImageEncoder(object):
         data_len = len(out)
         num_batches = int(data_len / batch_size)
 
+        #! what is s or e
         s, e = 0, 0
         for i in range(num_batches):
             s, e = i * batch_size, (i + 1) * batch_size

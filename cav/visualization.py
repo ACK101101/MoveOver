@@ -48,8 +48,8 @@ class Map:
     Class that keeps the image with the map and returns this image with (or without) the corresponding objects
     """
     def __init__(self, mapfile, config_file, params):
-        self.icons = Icons(config_file=config_file)
         self.mapimg = cv2.imread(mapfile)
+        self.icons = Icons(config_file=config_file)
         self.params = params
 
 
@@ -75,6 +75,7 @@ class Map:
         mapy = newmap.shape[0]
 
         for obj in objects:
+            #! can't find updateBBoxParams, where is it declared / what does it do
             box = obj.updateBBoxParams(self.params)
             x = int(round(box.birdEyeX))
             y = int(round(box.birdEyeY))

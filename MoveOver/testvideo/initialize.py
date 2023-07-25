@@ -16,7 +16,7 @@ pathlib.Path(config.DATA_PATH).mkdir(parents=True, exist_ok=True)
 pathlib.Path('./images/').mkdir(parents=True, exist_ok=True)
 
 # Provided example video
-VIDEO_FILE = '../../clips/3-01.mp4'
+VIDEO_FILE = '../../clips/1.mp4'
 
 # Camera view and bird view images
 CAM_VIEW = './images/frame_view1.jpg'
@@ -35,6 +35,10 @@ extractFrame(VIDEO_FILE, frameno = 0, dest_file = CAM_VIEW)
 #! Diff between camera view (SRC) and image view (DST)?
 #! Doesn't use sign
 ##!! needs to be done for each camera by dispatchers?
+
+#TODO:  use cv2 to open window of extracted image frames
+#       prompt selction of landmarks (camera view, get input; sky view, repeat sequence)
+#       display and store coordinates for json file
 SRC = np.float32([
     [581, 727], # Left speed limit
     [1458, 717], # Right speed limit
@@ -98,6 +102,7 @@ params = Parameters()
 params.generateParameters('./params.json')
 
 # loads mask, scales pixel values to 0-255 range, converts to int
+# TODO: method for automatically or assisting masking
 mask = (255*plt.imread(MASK_PATH)).astype(int)
 
 #! No blue? example mask is len() == 2 anyway

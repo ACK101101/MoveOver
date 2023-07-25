@@ -18,8 +18,10 @@ pathlib.Path('./images/').mkdir(parents=True, exist_ok=True) #! Might not need
 ### ISSUE: LOOK OUT FOR WHERE params.json IS USED!
 
 # set videofiles
-VIDEO_NAME = '4'
-MakeDetections(VIDEO_NAME, keep_awake=False, process_every=2)
+VIDEO_NAMES = ['6', '7', '12', '13', '14']
+for VIDEO_NAME in VIDEO_NAMES:
+    print("##### {v} #####".format(v=VIDEO_NAME))
+    MakeDetections(VIDEO_NAME, keep_awake=False, process_every=2)
 
 # TOPOINT = 'BL10' ## Bottom Left
 # image_encoder = ImageEncoder(config.ENCODER_PATH, config.ENCODER_INPUT_NAME, config.ENCODER_OUTPUT_NAME)
