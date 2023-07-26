@@ -18,234 +18,188 @@ from deep_sort.tracker import Tracker
 from deep_sort.detection import Detection
 
 # TODO: shorten imports
+# TODO: why use an encoder if the detections are already done
+# TODO: what is TOPOINT
+# TODO: resize isnt used?
+# TODO: why use socket in main loop
+# TODO: dont understand tracker predict and update
+
+# TODO: make skip_every consistent with make_detections.py
 
 class ReadDetections():
-    def __init__(self):
+    def __init__(self, vidname, save_log=None, max_cos=0.2, nn_budget=100, skip_first=0):
+        # TODO: setup paths to video, params, aerial, mask
+        self.VIDEO_NAME = vidname
+        self.detections = pickle.load(
+            open(f'{config.DATA_PATH}/detect{self.VIDEO_NAME}.p',
+                 'rb')
+            )
+        self.FRAME_FOLDER = os.path.join(config.DATA_PATH, 
+                                         f'frames_raw{self.VIDEO_NAME}/')  
+        Path(self.FRAME_FOLDER).mkdir(parents=True, exist_ok=True)
+        self.VIDEO_FILE = pickle.load(open(f'{config.DATA_PATH}/vid{self.VIDEO_NAME}.p', 'rb'))
+        self.SAVE_LANES = f'./data/lanes_detections{self.VIDEO_NAME}.csv' ###### Saves info about lanes
+        self.SAVE_LOG = save_log #### Saves logs with all detected objects (path to file or none)
+        
+        # init image encoder
         self.ENCODER_PATH = config.ENCODER_PATH
         self.ENCODER_INPUT_NAME = config.ENCODER_INPUT_NAME
         self.ENCODER_OUTPUT_NAME = config.ENCODER_OUTPUT_NAME
         self.BATCH_SIZE = config.ENCODER_BATCH_SIZE
-        pass
+        self.TOPOINT = 'BL10' # Bottom Left
+        self.encoder = create_box_encoder(self.ENCODER_PATH, batch_size=self.BATCH_SIZE)
+        
+        # init tracker detection trajectories
+        self.metric = nn_matching.NearestNeighborDistanceMetric(
+            "cosine", max_cos, nn_budget)
+        self.tracker = Tracker(self.metric)
+        
+        # init map between camera and aerial view
+        # TODO: make paths specific to video name
+        self.params = Parameters()
+        self.params.generateParameters('./params.json')
+        self.mymap = Map('./images/SkyView.jpg', './icons_simple.json', self.params)
+        
+        # init lane detection with mask
+        self.lanes_controller = Lanes('./images/mask.png', params=self.params)
+        
+        # How many seconds in the beginning should be skipped
+        self.SKIP_FIRST = skip_first
+        
+        self._process_detections()
+    
+    def _track_detections(self, bgr_image, boxes, scores, classes):
+        for box in boxes:
+            if self.TOPOINT != 'BC': box.setToPoint(self.TOPOINT)
+            #! TODO: don't understand
+            box.updateParams(self.params)
+        
+        boxes_array = np.array([[box.xLeft, box.yTop, 
+                                box.xRight - box.xLeft, 
+                                box.yBottom - box.yTop] for box in boxes])
+        
+        #! need to understand encoder
+        features = self.encoder(bgr_image, boxes_array)
+        detections = []
+        
+        #! reading in from detections file, makes Detection object
+        for box, score, objClass, f_vector in zip(boxes, scores, classes, features):
+            detection = Detection([box.xLeft, box.yTop, 
+                                    box.xRight - box.xLeft, 
+                                    box.yBottom - box.yTop], #BBox
+                                    score, f_vector,objClass
+                                )
+            detection.bbox = box
+            detections.append(detection)
+
+        #! updates detections list directly?
+        self.tracker.predict()
+        self.tracker.update(detections)    
+        
+        return
+    
+    def _save_detections(self, image, frame_num, logfile_lanes):
+        plotboxes = []
+        plotcolors = []
+        objects = []
+
+        if len(self.tracker.tracks) >= 1:
+            for track in self.tracker.tracks:
+                if not track.is_confirmed() or track.time_since_update >= 1:
+                    continue
+
+                #! what is the trackedObject - bb?
+                obj = track.trackedObject
+
+                if obj is not None:
+                    if obj.color is None:
+                        obj.color = (randint(0, 255), randint(0, 255), randint(0, 255))                        
+                    plotbox = obj.bboxes[-1]
+                    plotbox.trackId = track.track_id
+                    plotboxes.append(plotbox)
+                    plotcolors.append(obj.color)
+                    objects.append(obj)
+                
+                    #! need to look further into below class
+                    lane = self.lanes_controller.addObject(obj)
+                    log_line = '{},{},{}'.format(frame_num-1, lane, 
+                                                    obj.getParams(asCsv=True, speedLookback = 10)
+                                                )
+                    print(log_line, file=logfile_lanes)                              
+
+            #! plots bb and saves                                             
+            if len(plotboxes) >= 1:
+                vid = plotBoxes(image, plotboxes, colors=plotcolors)
+            else:
+                vid = image.copy()
+            cv2.imwrite(os.path.join(self.FRAME_FOLDER, 'im_{}.jpg'.format(str(frame_num-1).zfill(6))), vid)
+        
+        #! can clean up structure
+        #! save objects
+        if len(objects) > 0: 
+            logfile = open('./logs/{}'.format(self.SAVE_LOG, 'w'))
+            for obj in objects:
+                #! error with True  
+                line = '{},{},{}'.format(frame_num-1,time(),obj.getParams(asCsv=True))                     
+                print(line,file=logfile)   
+        
+        return
     
     def _process_detections(self):
-        TOPOINT = 'BL10' # Bottom Left
-        image_encoder = ImageEncoder(self.ENCODER_PATH, 
-                                     self.ENCODER_INPUT_NAME, 
-                                     self.ENCODER_OUTPUT_NAME)
-        encoder = create_box_encoder(self.ENCODER_PATH, batch_size=self.BATCH_SIZE)
-        
-        #! max distance from kth centroid?
-        max_cosine_distance = 0.2
-        #! only check first k distances per centroid?
-        nn_budget = 100
-        #! seems to init some sort of nn object
-        #! need to move down
-        metric = nn_matching.NearestNeighborDistanceMetric(
-            "cosine", max_cosine_distance, nn_budget)
-        
-        params = Parameters()
-        params.generateParameters('./params.json')
-        mymap = Map('./images/SkyView.jpg', './icons_simple.json', params)
-        
-        #! unsure, need to run to see how it works as lanes.py is poorly documented
-        lanes_controller = Lanes('./images/mask.png', params=params)
-        
-        #! setting up paths for main loop
-        #! can clean up ordering to make more readable
-        #! don't understand save_detections, creates empty file then reads from it 
-        SAVE_DETECTIONS = f'{config.DATA_PATH}/detections.p'
-        FRAME_FOLDER = os.path.join(config.DATA_PATH, 'frames_raw/')
-        VIDEO_FILE = pickle.load(open(f'{config.DATA_PATH}/videopath.p', 'rb'))
-        print ('Video path:', VIDEO_FILE)
-
-        Path(FRAME_FOLDER).mkdir(parents=True, exist_ok=True)
-
-        save_detections = pickle.load(open(SAVE_DETECTIONS,'rb'))
-        
-        SAVE_LOG = None #### Saves logs with all detected objects (path to file or none)
-
-        #! can try both; what info?
-        SAVE_LANES = None ###### Saves info about lanes
-        SAVE_LANES = './data/lanes_detections.csv' ###### Saves info about lanes
-
-        SKIP_FIRST = 0 # How many seconds in the beginning should be skipped
-        
-        #! opens video file, gets metadata about video
-        cap = cv2.VideoCapture(VIDEO_FILE) 
+        # opens video file, gets metadata about video
+        cap = cv2.VideoCapture(self.VIDEO_FILE) 
         FRAMES_SEC = cap.get(cv2.CAP_PROP_FPS)
-        VIDEO_X = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH)) 
-        VIDEO_Y = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT)) 
-
-        #! hyperparams for detection
-        MAX_BOXES_TO_DRAW = 100       #! not 100% sure, max bb per frame?
-        MIN_SCORE_THRESH = 0.5        #! confidence thresh for classification?
-        IOU_COMMON_THRESHOLD = 0.50   #! same as above?
-        NOT_DETECTED_TRHESHOLD = 1    #! not sure
-
-        MAPSHAPE = mymap.getMap().shape
-        print ('Y dimension of map is {:.3f} larger than Y dimension of the video'
-            .format(MAPSHAPE[0] / VIDEO_Y))
-
-        #! downsampling?
-        MAP_RESIZE = 3
-
-        print ('Y dimension of map is {:.3f} larger than Y dimension of the video. Size of the map is reduced {} times.'
-            .format(MAPSHAPE[0] / VIDEO_Y, MAP_RESIZE))
-
-
-        FINAL_X = VIDEO_X + int(MAPSHAPE[1] / MAP_RESIZE)
-        FINAL_Y = max(VIDEO_Y, int(MAPSHAPE[0] / MAP_RESIZE))
-
-        print ('Video size: [{}, {}], Final size: [{}, {}]'
-            .format(VIDEO_X, VIDEO_Y, FINAL_X, FINAL_Y))
-
-        RESIZE = False                #! not used
-
-        #! unclear, but pixel coords for video?
+        # TODO: change to list? arg for crop
         CROP_VID = False
         VID_LEFT = 0
         VID_RIGHT = 1920
         VID_UP = 0
-        
-        #! why reopen? seems like didn't actually modify the video above
-        cap = cv2.VideoCapture(VIDEO_FILE) 
-
-        #! specifies video codec but not sure what XVID is
-        fourcc = cv2.VideoWriter_fourcc(*'XVID')
-
-        out = None              #! not used
 
         objects = []
-
-        results = []            #! not used
-        colors = {}             #! not used
-
-        #! related to NN and BB but not sure how
-        tracker = Tracker(metric)
-
-        nr_skipped = 0          #! not used
-        i = 0
-        t = time()
+        frame_num = 0
+        start_time = time()
+        
+        # skips first k seconds
+        while frame_num < self.SKIP_FIRST * FRAMES_SEC:
+            _, image = cap.read()
+            frame_num += 1
 
         #! why use a socket
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
             # open lane log file to write to
-            if SAVE_LANES is not None:
-                logfile_lanes = open('{}'.format(SAVE_LANES), 'w')
+            logfile_lanes = open('{}'.format(self.SAVE_LANES), 'w')
 
             while cap.isOpened():
                 # time since starting and stats
-                t2 = time() - t
+                curr_time = time() - start_time
                 sys.stdout.write('{} frames done in {:.1f} seconds ({:.2f} frames/sec)    \r'.format(
-                    i, t2, i/t2))                   
+                    frame_num, curr_time, frame_num/curr_time))         
                 
-                frame_timeStamp = i/FRAMES_SEC      #! not used
-                
-                #! gets next frame; not sure what ret is maybe metadata
-                ret, image = cap.read()
-
-                # skips first k frames
-                if i < SKIP_FIRST * FRAMES_SEC:
-                    i += 1
-                    continue
+                _, image = cap.read()
+                frame_num += 1
                         
                 # crops the video
-                if CROP_VID:
-                    image = image[VID_UP:, VID_LEFT:VID_RIGHT, :]
+                if CROP_VID: image = image[VID_UP:, VID_LEFT:VID_RIGHT, :]
+                bgr_image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
                 
-                #! is save_detections a list of idxs := frames
-                if i+1 not in save_detections:
-                    break
+                # checks if frame in detections; if not, skip iter
+                if frame_num not in self.detections:
+                    continue
                 
-                #! even more confused as to what save_detections is
-                #! reading in predone detections per frame?
-                ###!!! what object is being saved in the save_detections file
-                boxes, scores, classes = save_detections[i+1] 
+                # read detections
+                boxes, scores, classes = self.detections[frame_num] 
                 
                 if len(boxes) >= 1:
-                    for box in boxes:
-                        if TOPOINT != 'BC':
-                            box.setToPoint(TOPOINT)         #! find in box class?
-                            
-                        box.updateParams(params)
-                    
-                    #! what are these bb? for
-                    boxes_array = [[box.xLeft, box.yTop, box.xRight - box.xLeft, box.yBottom - box.yTop] for box in boxes]
-                    boxes_array = np.array(boxes_array)
-                    
-                    #! need to understand encoder
-                    bgr_image = cv2.cvtColor(image,cv2.COLOR_BGR2RGB)
-                    features = encoder(bgr_image, boxes_array)
-                    detections = []
-
-                    #! reading in from save_detections file, makes Detection object
-                    for box, score, objClass, f_vector in zip(boxes, scores, classes, features):
-                        detection = Detection(
-                            [box.xLeft, box.yTop, box.xRight - box.xLeft, box.yBottom - box.yTop], #BBox
-                            score, f_vector,
-                            objClass
-                        )
-                        detection.bbox = box
-                        detections.append(detection)
-
-                    #! updates detections list directly?
-                    tracker.predict()
-                    tracker.update(detections)                
-                
-                #! if no boxes, what is being used to predict??
+                    self._track_detections(bgr_image, boxes, scores, classes)           
                 else:
-                    tracker.predict()
+                    self.tracker.predict()
                     
-                plotboxes = []
-                plotcolors = []
-                objects = []
-
-                if len(tracker.tracks) >= 1:
-                    for track in tracker.tracks:
-                        #! huh? why not use break structure
-                        if not track.is_confirmed() or track.time_since_update >= 1:
-                            continue
-
-                        #! what is the trackedObject - bb?
-                        obj = track.trackedObject
-
-                        if obj is not None:
-                            if obj.color is None:
-                                obj.color = (randint(0, 255), randint(0, 255), randint(0, 255))                        
-                            plotbox = obj.bboxes[-1]
-                            plotbox.trackId = track.track_id
-                            plotboxes.append(plotbox)
-                            plotcolors.append(obj.color)
-                            objects.append(obj)
-                            
-                            if SAVE_LANES is not None:
-                                #! need to look further into below class
-                                lane = lanes_controller.addObject(obj)
-                                if SAVE_LANES is not None:
-                                    log_line = '{},{},{}'.format(i, lane, obj.getParams(asCsv=True, speedLookback = 10))
-                                    print(log_line,file=logfile_lanes)                              
-
-                    #! plots bb and saves                                             
-                    if len(plotboxes) >= 1:
-                        vid = plotBoxes(image, plotboxes, colors=plotcolors)
-                    else:
-                        vid = image.copy()
-                    cv2.imwrite(os.path.join(FRAME_FOLDER, 'im_{}.jpg'.format(str(i).zfill(6))), vid)
-
-                #! can clean up structure
-                #! save objects
-                if len(objects) > 0:        
-                    if SAVE_LOG is not None:
-                        logfile = open('./logs/{}'.format(SAVE_LOG, 'w'))
-                        for obj in objects:
-                            #! error with True  
-                            line = '{},{},{}'.format(i,time(),obj.getParams(asCsv=true))                     
-                            print(line,file=logfile)                    
-                                        
-                i = i+1
-                        
+                self._save_detections(image, frame_num, logfile_lanes)                   
+            
         #! end stats video                  
-        t = time() - t                             
+        start_time = time() - start_time                             
         print('\n\n{} frames done in {:.1f} seconds ({:.2f} frames/sec)'.format(
-            i, t, i/t))                             
+            frame_num, start_time, frame_num/start_time))                             
         cap.release()
+        
+        return

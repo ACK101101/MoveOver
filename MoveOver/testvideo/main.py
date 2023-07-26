@@ -18,7 +18,7 @@ pathlib.Path('./images/').mkdir(parents=True, exist_ok=True) #! Might not need
 ### ISSUE: LOOK OUT FOR WHERE params.json IS USED!
 
 # set videofiles
-VIDEO_NAMES = ['6', '7', '12', '13', '14']
+VIDEO_NAMES = ['15']
 for VIDEO_NAME in VIDEO_NAMES:
     print("##### {v} #####".format(v=VIDEO_NAME))
     MakeDetections(VIDEO_NAME, keep_awake=False, process_every=2)

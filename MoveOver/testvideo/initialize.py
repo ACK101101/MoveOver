@@ -11,6 +11,11 @@ import numpy as np
 from moveoverlib.functions import *
 import matplotlib.pyplot as plt
 
+#TODO:  use cv2 to open window of extracted image frames
+#       prompt selction of landmarks (camera view, get input; sky view, repeat sequence)
+#       display and store coordinates for json file
+# make filenames of skyview and parameters specific to video name
+
 # Create /data and /images folder within ./MoveOver/example
 pathlib.Path(config.DATA_PATH).mkdir(parents=True, exist_ok=True) 
 pathlib.Path('./images/').mkdir(parents=True, exist_ok=True)
@@ -36,9 +41,6 @@ extractFrame(VIDEO_FILE, frameno = 0, dest_file = CAM_VIEW)
 #! Doesn't use sign
 ##!! needs to be done for each camera by dispatchers?
 
-#TODO:  use cv2 to open window of extracted image frames
-#       prompt selction of landmarks (camera view, get input; sky view, repeat sequence)
-#       display and store coordinates for json file
 SRC = np.float32([
     [581, 727], # Left speed limit
     [1458, 717], # Right speed limit
