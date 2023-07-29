@@ -5,164 +5,119 @@ sys.path.insert(0,'..')
 
 import cv2
 import pathlib 
+import time
 import pickle
 import config
 import numpy as np
 from moveoverlib.functions import *
 import matplotlib.pyplot as plt
 
-# TODO:  use cv2 to open window of extracted image frames
-#       prompt selction of landmarks (camera view, get input; sky view, repeat sequence)
-#       display and store coordinates for json file
-# make filenames of skyview and parameters specific to video name
+# TODO: write useful variables to config file
+#       OR
+#       Make experiment class for each varible
 
-# Create /data and /images folder within ./MoveOver/example
-pathlib.Path(config.DATA_PATH).mkdir(parents=True, exist_ok=True) 
-pathlib.Path('./images/').mkdir(parents=True, exist_ok=True)
+# TODO: add check for existing config/param file, skip if so
 
-# Provided example video
-VID_NAME = '3-01'
-VIDEO_FILE = f'../../clips/{VID_NAME}.mp4'
+class MakeParams():
+    """ generate config file
+        setup file and directory names
+        prompt user to select reference points to generate map
+    """
+    def __init__(self, video_info):
+        # Provided example video
+        self.VID_NAME = video_info["VideoName"]
+        self.VIDEO_FILE = f'./clips/{self.VID_NAME}.mp4'
+        self.CAM_VIEW = f'./images/cam_view{self.VID_NAME}.jpg'         # setup file name
+        self.BIRD_VIEW = f'./images/{video_info["BirdView"]}'           # already exists     
+        
+        self._make_directories()
+        
+        extractFrame(self.VIDEO_FILE, frameno = 0, dest_file = self.CAM_VIEW)
+        
+        # TODO: not used; save or delete?
+        self.cam_points, self.bird_points = self._get_reference_points()
+        
+        self._write_config()
+        
+    def _make_directories(self):
+        pathlib.Path(self.VID_NAME).mkdir(parents=True, exist_ok=True)
+        pathlib.Path('./data/').mkdir(parents=True, exist_ok=True) 
+        pathlib.Path('./images/').mkdir(parents=True, exist_ok=True)
+        print(f"Made directories for video {self.VID_NAME}")
+        
+        return
 
-# Camera view and bird view images
-CAM_VIEW = f'./images/cam_view{VID_NAME}.jpg'
-BIRD_VIEW = './images/I-435_SB.PNG'
+    def _get_reference_points(self):
+        isHappy = False
+        while not isHappy:
+            plt.figure(0, figsize=(7, 5))
+            plt.imshow(cv2.cvtColor(cv2.imread(self.CAM_VIEW), cv2.COLOR_BGR2RGB))
+            plt.title("Camera View: \n Select 4 reference points (ie. Top Left, Top Right, Bottom Left, Bottom Right)")
+            cam_points = plt.ginput(4)
+            time.sleep(1)
+            plt.close()
+            
+            plt.figure(1, figsize=(7, 5))
+            plt.imshow(cv2.cvtColor(cv2.imread(self.BIRD_VIEW), cv2.COLOR_BGR2RGB))
+            plt.title("Bird View: \n Select 4 IDENTICAL reference points IN THE SAME ORDER \n (ie. Top Left, Top Right, Bottom Left, Bottom Right)")
+            bird_points = plt.ginput(4)
+            time.sleep(1)
+            plt.close()
+            
+            plt.figure(0)
+            plt.imshow(cv2.cvtColor(cv2.imread(self.CAM_VIEW), cv2.COLOR_BGR2RGB))
+            plt.scatter([x[0] for x in cam_points], [y[1] for y in cam_points], c='r')
+            plt.title("When ready to say y/n in terminal, close both windows")
+            plt.figure(1)
+            plt.imshow(cv2.cvtColor(cv2.imread(self.BIRD_VIEW), cv2.COLOR_BGR2RGB))
+            plt.scatter([x[0] for x in bird_points], [y[1] for y in bird_points], c='r')
+            plt.title("Do the points match corresponding locations and selection order?")
+            plt.show()
 
-# Write binary version of video to new ./data folder
-# pickle.dump(VIDEO_FILE, open(f'{config.DATA_PATH}/videopath.p', 'wb'))
+            isHappy = input("Are you happy with the points selected (y/n): ").lower().strip() == 'y'
 
-# Extract frames from video and save in new ./images folder
-extractFrame(VIDEO_FILE, frameno = 0, dest_file = CAM_VIEW)
+        return np.float32(cam_points), np.float32(bird_points)
 
-# TODO: use plt.ginput()
-
-# SRC = np.float32([
-#     [581, 727], # Left speed limit
-#     [1458, 717], # Right speed limit
-#     [800, 430], # Left railing
-#     [1578, 411], # Right railing
-#     [643, 474], # Sign
-# ])
-
-# DST = np.float32([
-#     [206, 29], # Left speed limit
-#     [41, 75], # Right speed limit
-#     [567, 925], # Left railing
-#     [287, 1170], # Right railing
-#     [543, 724], # Sign
-# ])
-
-
-# print ('  "cameraPoints" : [[{}, {}], [{}, {}], [{}, {}], [{}, {}]],'.format(
-#     int(SRC[0][0]), int(SRC[0][1]),
-#     int(SRC[1][0]), int(SRC[1][1]),
-#     int(SRC[2][0]), int(SRC[2][1]),
-#     int(SRC[3][0]), int(SRC[3][1])
-# ))
-
-# print ('  "birdEyePoints" : [[{}, {}], [{}, {}], [{}, {}], [{}, {}]],'.format(
-#     int(DST[0][0]), int(DST[0][1]),
-#     int(DST[1][0]), int(DST[1][1]),
-#     int(DST[2][0]), int(DST[2][1]),
-#     int(DST[3][0]), int(DST[3][1]),
-# ))
-
-# # Creates a (maxtrix) mapping from camera view to bird's eye view
-# # and its inverse
-# M = cv2.getPerspectiveTransform(SRC[:4], DST[:4])
-# Minv = cv2.getPerspectiveTransform(DST[:4], SRC[:4])
-
-# # Show points on original camera and transformed bird's eye
-# #! sky view is already provided, how was it made? Grab from google maps?
-# BIRD_VIEW = './images/SkyView.jpg'
-# _ = displayPoints(SRC, M, CAM_VIEW, BIRD_VIEW)
-
-# # Show transformation from bird to camera
-# _ = displayPoints(DST, Minv, BIRD_VIEW,  CAM_VIEW)
-
-# #! What are these; from google maps?
-# #! from params.json...
-# latlon1 = 45.743893, -122.660828    # "latLonCoordinates"[0] flipped (x0, x1)
-# xy1 = 96, 30                        # "birdEyeCoordinates"[0]
-# latlon2 = 45.742497, -122.659864    # "latLonCoordinates"[1] flipped (x0, x1)
-# xy2 = 635, 1151                     # "birdEyeCoordinates"[1]
-
-# #! Is this also done ahead of time manually?
-# MASK_PATH = './images/mask.png'
-
-# # import cav
-# sys.path.insert(0,'../..')
-# from cav.parameters import Parameters
-
-# #! params.json contains same mystery points from SRC and DST
-# params = Parameters()
-# params.generateParameters('./params.json')
-
-# # loads mask, scales pixel values to 0-255 range, converts to int
-# # TODO: method for automatically or assisting masking
-# mask = (255*plt.imread(MASK_PATH)).astype(int)
-
-# #! No blue? example mask is len() == 2 anyway
-# #! converts 3d mask to 2d? I think it just helps convert to grayscale
-# if (len(mask.shape) == 3) and (mask.shape[2] > 1):
-#     mask = mask[:, :, 0]
-
-# plt.imshow(mask, cmap='gray')
-# #! Why use unique?
-# unique = np.unique(mask, return_counts=True)
-# print(unique)
-
-# #! Premade test? Don't understand how lane_mask and unique are related
-# #! How was lane_mask found?
-# #! Why do the colors used in the mask confirm the parameters?
-# if [0] + params.lanes_mask == sorted(unique[0]):
-#     print ('OK! Mask parameers defined correctly in params.json.')
-# else:
-#     print (f'json file : {[0] + params.lanes_mask}')
-#     print (f'from image : {sorted(unique)}')
+    def _make_map(self):
+        # Creates a (maxtrix) mapping from camera view to bird's eye view
+        M = cv2.getPerspectiveTransform(self.cam_points[:4], self.bird_points[:4])
+        Minv = cv2.getPerspectiveTransform(self.bird_points[:4], self.cam_points[:4])
+        return 
     
+    # TODO: whats going on with the mask stuff
+    # way to auto generate? or how to you make it
+    def _process_mask(self):
+        return
     
-# #! Writes json file, but uses the json file in cells above?
-# #! Seems like frame_view1 and SkyView aren't modified and are given ahead of time
-# img = cv2.imread(CAM_VIEW)
-# skyview = cv2.imread(BIRD_VIEW)
+    # TODO: what params are actually used later?
+    # I don't think the coordinates are used. maybe good for storage? idk
+    # could save as not a json file
+    def _write_config(self):
+        cam_view = cv2.imread(self.CAM_VIEW)
+        bird_view = cv2.imread(self.BIRD_VIEW)
+        jsonfile = '''{{
+            "videoShape" : [{}, {}],
+            "birdEyeViewShape" : [{}, {}],
+            
+            "cameraPoints" : [[{}, {}], [{}, {}], [{}, {}], [{}, {}]],
+            "birdEyePoints" : [[{}, {}], [{}, {}], [{}, {}], [{}, {}]]
+        }}'''.format(
+            cam_view.shape[1], cam_view.shape[0], # videoShape
+            bird_view.shape[1], bird_view.shape[0], # birdEyeViewShape
+            
+            int(self.cam_points[0][0]), int(self.cam_points[0][1]), # cameraPoints
+            int(self.cam_points[1][0]), int(self.cam_points[1][1]),
+            int(self.cam_points[2][0]), int(self.cam_points[2][1]),
+            int(self.cam_points[3][0]), int(self.cam_points[3][1]), # cameraPointsEnd 
+            
+            int(self.bird_points[0][0]), int(self.bird_points[0][1]), # birdEyePoints
+            int(self.bird_points[1][0]), int(self.bird_points[1][1]),
+            int(self.bird_points[2][0]), int(self.bird_points[2][1]),
+            int(self.bird_points[3][0]), int(self.bird_points[3][1]) # birdEyePointsEnd
+        )
 
-# jsonfile = '''{{
-#   "videoShape" : [{}, {}],
-#   "birdEyeViewShape" : [{}, {}],
-
-#   "cameraPoints" : [[{}, {}], [{}, {}], [{}, {}], [{}, {}]],
-#   "birdEyePoints" : [[{}, {}], [{}, {}], [{}, {}], [{}, {}]],
-
-#   "birdEyeCoordinates" : [[{}, {}], [{}, {}]],
-#   "latLonCoordinates" : [[{}, {}], [{}, {}]],
-#   "elevation" : 40,
-    
-#   "lanes_mask" : {}
-# }}'''.format(
-#     img.shape[1], img.shape[0], # videoShape
-#     skyview.shape[1], skyview.shape[0], # birdEyeViewShape
-    
-#     int(SRC[0][0]), int(SRC[0][1]), # cameraPoints
-#     int(SRC[1][0]), int(SRC[1][1]),
-#     int(SRC[2][0]), int(SRC[2][1]),
-#     int(SRC[3][0]), int(SRC[3][1]), # cameraPointsEnd 
-    
-#     int(DST[0][0]), int(DST[0][1]), # birdEyePoints
-#     int(DST[1][0]), int(DST[1][1]),
-#     int(DST[2][0]), int(DST[2][1]),
-#     int(DST[3][0]), int(DST[3][1]), # birdEyePointsEnd
-    
-#     xy1[0], xy1[1], xy2[0], xy2[1], #birdEyeCoordinates
-
-#     latlon1[1], latlon1[0], #latLonCoordinates
-#     latlon2[1], latlon2[0],
-    
-#     str(sorted(unique[0])[1:]), # lanes_mask
-# )
-
-# with open('params.json', 'w') as f:
-#     for line in jsonfile.split('\n'):
-#         print (line)
-#         f.write(line + '\n')
-
+        with open(f'./{self.VID_NAME}/params.json', 'w') as f:
+            for line in jsonfile.split('\n'):
+                f.write(line + '\n')
+        
+        return
