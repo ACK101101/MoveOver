@@ -76,7 +76,7 @@ class Parameters:
 
     def __generate_latlon_coefs(self, birdEyeCoordinates, latLonCoordinates):
         """
-        Generates the coeffitiens responsible for going from pixels to latitudes, longitudes.
+        Generates the coefficients responsible for going from pixels to latitudes, longitudes.
         Arguments:
             birdEyeCoordinates -    list of lists of coordinates from the Bird Eye Image
                                     [ [x1, y1], [x2, y2] ]

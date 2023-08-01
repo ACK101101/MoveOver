@@ -1,20 +1,21 @@
 import pyautogui
 pyautogui.FAILSAFE = False
 
-import pickle
-import os
 import sys
+sys.path.insert(0,'../..')
+sys.path.insert(0,'..')
+
+import pickle
 import cv2
 import config
 from pathlib import Path
 from time import time
 from cav.detection import ObjectDetector
 
-# TODO: consolidate os and sys and pathlib so only need one
-# TODO: option to skip frames to reduce runtime  
+# TODO: redo folder structure
 
 class MakeDetections():
-    def __init__(self, vidname, keep_awake=False, process_every=1):
+    def __init__(self, Paths, keep_awake=False, process_every=1):
         """runs and saves detections automatically when called
 
         Args:
@@ -22,24 +23,27 @@ class MakeDetections():
             keep_awake (bool): keep machine awake
             process_every (int): processes every kth frame (default 1, processes every frame)
         """
-        self.VIDEO_NAME = vidname
-        self.VIDEO_FILE = f'../../clips/{self.VIDEO_NAME}.mp4'
-        self.DATA_PATH = config.DATA_PATH
-        self.MODEL_PATH = config.MODEL_PATH
         self.KEEP_AWAKE = keep_awake
         self.PROCESS_EVERY = process_every
-        self.SAVE_DETECTIONS = os.path.join(self.DATA_PATH, 
-                                            f'detect{self.VIDEO_NAME}.p')
         self.CUT_UPPER = 0
         self.detections = {}
-        self.model = ObjectDetector(self.MODEL_PATH) 
-                       
-        pickle.dump(self.VIDEO_FILE, 
-                    open(f'{self.DATA_PATH}/vid{self.VIDEO_NAME}.p', 
-                         'wb'))                                   # makes path and directories to save detections
-        Path(os.sep.join(self.SAVE_DETECTIONS.split(os.sep)[:-1])).mkdir(parents=True, exist_ok=True)                                                     # model
+        self.model = ObjectDetector(Paths.MODEL_PATH)
+        
+        isContinue = self._check_existing(Paths)
+        if isContinue:             
+            pickle.dump(Paths.VIDEO_FILE, 
+                        open(f'{Paths.DATA_PATH}/vid{Paths.VIDEO_NAME}.p', 'wb'))                                   # makes path and directories to save detections                                                  # model
 
-        self._run_model()
+            self._run_model(Paths)
+    
+    def _check_existing(self, Paths):
+        if Path(Paths.SAVE_DETECTIONS).exists():
+            print("It looks like the detections for this video already exists.")
+            isContinue = input("Do you want to redo them? (y/n): ").lower().strip() == 'y'
+            if not isContinue:
+                print("Skipping detections")
+                return False
+        return True
     
     def _keep_awake(self):
         """moves mouse and presses key to keep computer from shutting off
@@ -50,11 +54,11 @@ class MakeDetections():
         pyautogui.press('shift')
         return
     
-    def _run_model(self):
+    def _run_model(self, Paths):
         """passes each frame thru model, saves detections
         """
         # get video and setup 
-        cap = cv2.VideoCapture(self.VIDEO_FILE) 
+        cap = cv2.VideoCapture(Paths.VIDEO_FILE) 
         fps = cap.get(cv2.CAP_PROP_FPS)
         frame_num = 0
         start_time = time()  
@@ -88,7 +92,7 @@ class MakeDetections():
         cap.release()                   # when video is over
         
         # save detections
-        pickle.dump(self.detections, open(self.SAVE_DETECTIONS,'wb'))
-        print (f'\nDetections saved in {self.SAVE_DETECTIONS}.')
+        pickle.dump(self.detections, open(Paths.SAVE_DETECTIONS,'wb'))
+        print (f'\nDetections saved in {Paths.SAVE_DETECTIONS}.')
         
         return

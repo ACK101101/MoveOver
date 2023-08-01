@@ -17,7 +17,7 @@ from deep_sort import nn_matching
 from deep_sort.tracker import Tracker
 from deep_sort.detection import Detection
 
-# TODO: shorten imports
+# TODO: when generating params, where do "birdEyeCoordinates" and "latLonCoordinates" come from
 # TODO: why use an encoder if the detections are already done
 # TODO: what is TOPOINT
 # TODO: resize isnt used?

@@ -1,16 +1,8 @@
 import pandas as pd
 
-from initialize import MakeParams
-# from make_detections import MakeDetections
-
-# setup paths and directories
-# pathlib.Path(config.DATA_PATH).mkdir(parents=True, exist_ok=True)
-# pathlib.Path('./images/').mkdir(parents=True, exist_ok=True) #! Might not need 
-
-### TODO: Checkpoint / customize what parts get run
-### TODO: email psekula; where do the mask and coordinates come from?
-### TODO: message Haley; possible to get coordinates and masks?
-### ISSUE: LOOK OUT FOR WHERE params.json IS USED!
+from initialize import Experiment
+from make_detections import MakeDetections
+from read_detections import ReadDetections
 
 def main():
     """for each video in clips directory:
@@ -22,8 +14,8 @@ def main():
     experiment_df = pd.read_csv("experimentInfo.csv")
     for _, video_info in experiment_df.iterrows():
         print(f'##### Video {video_info["VideoName"]} #####')
-        MakeParams(video_info)
-        # MakeDetections(VIDEO_NAME, keep_awake=False, process_every=2)
+        Paths = Experiment(video_info)
+        MakeDetections(Paths, keep_awake=False, process_every=2)
         
     return
 
