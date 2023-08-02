@@ -5,6 +5,7 @@ sys.path.insert(0,'..')
 sys.path.insert(0,'../..')
 
 import cv2
+import os
 import config
 from pathlib import Path
 import time
@@ -24,20 +25,28 @@ class Experiment():
         prompt user to select reference points to generate map
         stores paths used in experiment
     """
-    def __init__(self, video_info):
+    def __init__(self, video_info, process_every):
         # Provided example video
         self.VIDEO_NAME = video_info["VideoName"]
+        self.DATA_PATH = config.DATA_PATH
+        self.IMAGE_PATH = './images/'
+        
         self.VIDEO_FILE = f'./clips/{self.VIDEO_NAME}.mp4'
         self.CAM_VIEW = f'./images/cam_view{self.VIDEO_NAME}.jpg'         # setup file name
         self.BIRD_VIEW = f'./images/{video_info["BirdView"]}'           # already exists     
-        self.PARAM_FILE = f'./{self.VIDEO_NAME}/params{self.VIDEO_NAME}.json'
-        self.DATA_PATH = config.DATA_PATH
-        self.MODEL_PATH = config.MODEL_PATH
-        self.SAVE_DETECTIONS = Path(self.DATA_PATH).joinpath(Path(f'detect{self.VIDEO_NAME}.p'))
         
+        self.PARAM_FILE = f'./{self.VIDEO_NAME}/params{self.VIDEO_NAME}.json'
+        self.FRAME_FOLDER = os.path.join(self.DATA_PATH, f'frames_raw{self.VIDEO_NAME}/')
+        self.VIDEO_BINARY = os.path.join(self.DATA_PATH, f'vid{self.VIDEO_NAME}.p')
+        self.SAVE_DETECTIONS = os.path.join(self.DATA_PATH, f'detect{self.VIDEO_NAME}.p')
+        self.SAVE_LANES = f'./data/lanes_detections{self.VIDEO_NAME}.csv' ###### Saves info about lanes
+        
+        self.process_every = process_every
+
         isContinue = self._check_existing()
         if isContinue:
             self._make_directories()
+            print(self.CAM_VIEW)
             extractFrame(self.VIDEO_FILE, frameno = 0, dest_file = self.CAM_VIEW)
             self.cam_points, self.bird_points = self._get_reference_points()
             self._write_config()
@@ -57,8 +66,9 @@ class Experiment():
         
     def _make_directories(self):
         Path(self.VIDEO_NAME).mkdir(parents=True, exist_ok=True)
-        Path('./data/').mkdir(parents=True, exist_ok=True) 
-        Path('./images/').mkdir(parents=True, exist_ok=True)
+        Path(self.DATA_PATH).mkdir(parents=True, exist_ok=True) 
+        Path(self.IMAGE_PATH).mkdir(parents=True, exist_ok=True)
+        Path(self.FRAME_FOLDER).mkdir(parents=True, exist_ok=True)
         print(f"Made directories for video {self.VIDEO_NAME}")
         
         return
@@ -117,9 +127,8 @@ class Experiment():
     def _process_mask(self):
         return
     
-    # TODO: what params are actually used later?
-    # I don't think the coordinates are used. maybe good for storage? idk
-    # could save as not a json file
+    # TODO: where do birdEye and latLonCoordinates come from? 
+    # wouldnt they be the same?
     def _write_config(self):
         print(f"Writing jsonfile at {self.PARAM_FILE}")
         cam_view = cv2.imread(self.CAM_VIEW)
@@ -129,7 +138,10 @@ class Experiment():
     "birdEyeViewShape" : [{}, {}],
     
     "cameraPoints" : [[{}, {}], [{}, {}], [{}, {}], [{}, {}]],
-    "birdEyePoints" : [[{}, {}], [{}, {}], [{}, {}], [{}, {}]]
+    "birdEyePoints" : [[{}, {}], [{}, {}], [{}, {}], [{}, {}]],
+    
+    "birdEyeCoordinates" : [[96, 30], [635, 1151]],
+    "latLonCoordinates" : [[-122.660828, 45.743893], [-122.659864, 45.742497]]
 }}'''.format(
             cam_view.shape[1], cam_view.shape[0], # videoShape
             bird_view.shape[1], bird_view.shape[0], # birdEyeViewShape

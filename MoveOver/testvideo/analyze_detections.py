@@ -1,5 +1,4 @@
 import sys
-#! does only the last command stand or does it create an order for searching
 sys.path.insert(0,'../..')
 sys.path.insert(0,'..')
 
@@ -14,18 +13,18 @@ from time import time, strftime, gmtime
 
 import config
 
-SKIP_FIRST = 3 # How many seconds to skip
+class AnalyzeDetections():
+    def __init__(self, Paths):
+        self.SKIP_FIRST = 3 # How many seconds to skip
 
-VIDEO_FILE = pickle.load(open(f'{config.DATA_PATH}/videopath.p', 'rb'))
+        self.detections = pickle.load(open(Paths.SAVE_DETECTIONS,'rb'))
+        # TODO: vid_length hard coded?
+        self.vid_length = 5*60+3 # Length of video, in seconds
+        self.vid_frames = max(self.detections.keys())
 
-
-SAVE_DETECTIONS = f'{config.DATA_PATH}/detections.p'
-save_detections = pickle.load(open(SAVE_DETECTIONS,'rb'))
-vid_length = 5*60+3 # Length of video, in seconds
-vid_frames = max(save_detections.keys())
-
-OVERWRITE_FPS = vid_frames / vid_length
-OVERWRITE_FPS = 0
+        # TODO: where is this used
+        self.OVERWRITE_FPS = self.vid_frames / self.vid_length
+        self.OVERWRITE_FPS = 0
 
 cap = cv2.VideoCapture(VIDEO_FILE) 
 if OVERWRITE_FPS > 0:
@@ -36,7 +35,9 @@ else:
 print ('FPS:', fps)
 
 dfraw = pd.read_csv('./data/lanes_detections.csv', header=None)
-dfraw.columns = ['frame', 'lane', 'objectId', 'objectType', 'secMark', 'xLeft', 'xRight', 'yTop', 'yBottom', 'lat', 'lon', 'speed', 'heading', 'elevation'] 
+dfraw.columns = ['frame', 'lane', 'objectId', 'objectType', 'secMark', 
+                 'xLeft', 'xRight', 'yTop', 'yBottom', 'lat', 'lon', 
+                 'speed', 'heading', 'elevation'] 
 dfraw.speed = dfraw.speed.replace('None', np.nan).astype(float)
 
 if SKIP_FIRST is not None:
@@ -45,6 +46,8 @@ if SKIP_FIRST is not None:
 print (dfraw.shape)
 print (dfraw.columns)
 dfraw.head()
+
+# TODO: are these manually made?
 
 LANES_FROM = (1, 2) # The cars should move over from these lanes
 LANES_TO = (4, 5) #the target lanes for the cars from lanes_from (we want to move over to this lane)
@@ -731,7 +734,8 @@ call(command.split())
 size_source = os.path.getsize(f'{videoname}.avi')
 size_dest = os.path.getsize(f'{videoname}.mp4')
 
-print (f'Done in {time()-t:.1f} seconds. File size reduced {size_source/size_dest:.1f} times (from {size_source/1024/1024:,.1f} MB to {size_dest/1024/1024:,.1f} MB.)')
+print (f'Done in {time()-t:.1f} seconds. File size reduced {size_source/size_dest:.1f} \
+        times (from {size_source/1024/1024:,.1f} MB to {size_dest/1024/1024:,.1f} MB.)')
 
 
 videoname = f'{config.DATA_PATH}/videos/video'
@@ -750,7 +754,8 @@ call(command.split())
 size_source = os.path.getsize(f'{videoname}.avi')
 size_dest = os.path.getsize(f'{videoname}.mp4')
 
-print (f'Done in {time()-t:.1f} seconds. File size reduced {size_source/size_dest:.1f} times (from {size_source/1024/1024:,.1f} MB to {size_dest/1024/1024:,.1f} MB.)')
+print (f'Done in {time()-t:.1f} seconds. File size reduced {size_source/size_dest:.1f} \
+        times (from {size_source/1024/1024:,.1f} MB to {size_dest/1024/1024:,.1f} MB.)')
 
 
 videoname = f'{config.DATA_PATH}/videos/video_short'

@@ -15,7 +15,7 @@ from cav.detection import ObjectDetector
 # TODO: redo folder structure
 
 class MakeDetections():
-    def __init__(self, Paths, keep_awake=False, process_every=1):
+    def __init__(self, Paths, keep_awake=False):
         """runs and saves detections automatically when called
 
         Args:
@@ -24,15 +24,15 @@ class MakeDetections():
             process_every (int): processes every kth frame (default 1, processes every frame)
         """
         self.KEEP_AWAKE = keep_awake
-        self.PROCESS_EVERY = process_every
+        self.PROCESS_EVERY = Paths.process_every
         self.CUT_UPPER = 0
         self.detections = {}
-        self.model = ObjectDetector(Paths.MODEL_PATH)
+        self.MODEL_PATH = config.MODEL_PATH
+        self.model = ObjectDetector(self.MODEL_PATH)
         
         isContinue = self._check_existing(Paths)
         if isContinue:             
-            pickle.dump(Paths.VIDEO_FILE, 
-                        open(f'{Paths.DATA_PATH}/vid{Paths.VIDEO_NAME}.p', 'wb'))                                   # makes path and directories to save detections                                                  # model
+            pickle.dump(Paths.VIDEO_FILE, open(Paths.VIDEO_BINARY, 'wb'))                                   # makes path and directories to save detections                                                  # model
 
             self._run_model(Paths)
     
