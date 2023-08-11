@@ -154,38 +154,36 @@ class ReadDetections():
         while frame_num < self.SKIP_FIRST * FRAMES_SEC:
             _, image = cap.read()
             frame_num += 1
+        
+        # open lane log file to write to
+        logfile_lanes = open('{}'.format(self.SAVE_LANES), 'w')
 
-        #TODO: why use a socket
-        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-            # open lane log file to write to
-            logfile_lanes = open('{}'.format(self.SAVE_LANES), 'w')
-
-            while cap.isOpened():
-                # time since starting and stats
-                curr_time = time() - start_time
-                sys.stdout.write('{} frames done in {:.1f} seconds ({:.2f} frames/sec)    \r'.format(
-                    frame_num, curr_time, frame_num/curr_time))         
-                
-                _, image = cap.read()
-                frame_num += 1
-                        
-                # crops the video
-                if CROP_VID: image = image[VID_UP:, VID_LEFT:VID_RIGHT, :]
-                bgr_image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-                
-                # checks if frame in detections; if not, skip iter
-                if frame_num not in Paths.SAVE_DETECTIONS:
-                    continue
-                
-                # read detections
-                boxes, scores, classes = Paths.SAVE_DETECTIONS[frame_num] 
-                
-                if len(boxes) >= 1:
-                    self._track_detections(bgr_image, boxes, scores, classes)           
-                else:
-                    self.tracker.predict()
+        while cap.isOpened():
+            # time since starting and stats
+            curr_time = time() - start_time
+            sys.stdout.write('{} frames done in {:.1f} seconds ({:.2f} frames/sec)    \r'.format(
+                frame_num, curr_time, frame_num/curr_time))         
+            
+            _, image = cap.read()
+            frame_num += 1
                     
-                self._save_detections(image, frame_num, logfile_lanes)                   
+            # crops the video
+            if CROP_VID: image = image[VID_UP:, VID_LEFT:VID_RIGHT, :]
+            bgr_image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+            
+            # checks if frame in detections; if not, skip iter
+            if frame_num not in Paths.SAVE_DETECTIONS:
+                continue
+            
+            # read detections
+            boxes, scores, classes = Paths.SAVE_DETECTIONS[frame_num] 
+            
+            if len(boxes) >= 1:
+                self._track_detections(bgr_image, boxes, scores, classes)           
+            else:
+                self.tracker.predict()
+                
+            self._save_detections(image, frame_num, logfile_lanes)                   
             
         #! end stats video                  
         start_time = time() - start_time                             

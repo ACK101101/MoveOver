@@ -30,8 +30,8 @@ def main():
             Paths = Experiment(video_info, process_every)
             MakeDetections(Paths, keep_awake=False)
             ReadDetections(Paths)
+            AnalyzeDetections(Paths)
             
-        
     return
 
 main()
